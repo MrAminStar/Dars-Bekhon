@@ -1427,6 +1427,10 @@ body[data-density="compact"] .stat{padding:9px}
   <div class="card span-4">
     <h2>🧪 ثبت آزمون آزمایشی</h2><p class="muted">تراز و درصد هر درس را بعد از هر آزمون دوره‌ای (قلم‌چی، گاج، سنجش و…) ثبت کن تا روند واقعی پیشرفتت را ببینی.</p>
     <div class="formgrid">
+      <div><label>پایه تحصیلی</label><select id="mockExamGrade" onchange="setMockExamGradeCurriculum()"><option value="10">دهم</option><option value="11">یازدهم</option><option value="12">دوازدهم</option></select></div>
+      <div><label>رشته تحصیلی</label><select id="mockExamCurriculum" onchange="setMockExamGradeCurriculum()"><option value="experimental">🧬 تجربی</option><option value="mathematics">📐 ریاضی</option><option value="humanities">📚 انسانی</option></select></div>
+    </div>
+    <div class="formgrid">
       <div><label>تاریخ آزمون (شمسی)</label>
         <div class="mock-jalali-date">
           <select id="mockExamDateDay"></select>
@@ -1439,7 +1443,7 @@ body[data-density="compact"] .stat{padding:9px}
       <div><label>تراز کل</label><input id="mockExamPercentile" type="number" min="0" max="10000" step="1" placeholder="مثلاً 6200"></div>
       <div><label>رتبه کشوری (اختیاری)</label><input id="mockExamRank" type="number" min="1" placeholder="مثلاً 1500"></div>
     </div>
-    <div class="muted small" style="margin:12px 0 6px">درصد هر درس (اختیاری — بر اساس رشته انتخابی)</div>
+    <div class="muted small" style="margin:12px 0 6px">درصد هر درس تخصصی (اختیاری — بر اساس پایه و رشته انتخاب‌شده در بالا)</div>
     <div class="mock-subj-grid" id="mockExamSubjects"></div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" onclick="addMockExam()">➕ ثبت آزمون</button></div>
   </div>
@@ -2242,7 +2246,8 @@ function freshState(){
 defaultCurriculum:"",defaultGrade:"10",
 moodEmoji:"📚",moodLabel:"مطالعه‌گر",customMoods:null,
       moodUserSet:false,moodAuto:true,appTheme:"dark",
-      examDate:"",planStartDate:"",lastBackupAt:null,backupReminderSnoozeUntil:null,notifyRoutines:false},
+      examDate:"",planStartDate:"",lastBackupAt:null,backupReminderSnoozeUntil:null,notifyRoutines:false,
+      mockExamGrade:"10",mockExamCurriculum:""},
     subjects,episodes:[],quests:[],bosses:[],customRewards:[],achievements:{},history:{},
     lastQuality:"—",leitner:{cards:[]},classes:[],checklists:{},
     checklistVersion:10,customTasks:[],tasksDone:{},taskOverrides:{},routines:[],routineChecks:{},mistakes:[],smartPlan:null,
@@ -2853,19 +2858,132 @@ window.addMistake=addMistake;window.renderMistakes=renderMistakes;window.resolve
 ensureMistakes();populateMistakeSubjects();
 
 /* ===================== MOCK EXAMS (آزمون‌های آزمایشی) ===================== */
-function ensureMockExams(){if(!Array.isArray(state.mockExams))state.mockExams=[]}
-function mockExamSubjectKeys(curriculum){
-  const g=curriculumGroups[curriculum];
-  const general=["persian","dini","arabic","english"];
-  if(!g)return general;
-  return [...new Set([...general,...g.concours])].filter(k=>SUBJECTS[k]);
+const MOCK_EXAM_SUBJECT_LISTS={
+  experimental:{
+    "12":[
+      {key:"biology_pre",label:"زیست‌شناسی ۱ و ۲ (پایه)",icon:"🧬"},
+      {key:"biology_12",label:"زیست‌شناسی ۳ (دوازدهم)",icon:"🧬"},
+      {key:"physics_pre",label:"فیزیک ۱ و ۲ (پایه)",icon:"⚛️"},
+      {key:"physics_12",label:"فیزیک ۳ (دوازدهم)",icon:"⚛️"},
+      {key:"chemistry_pre",label:"شیمی ۱ و ۲ (پایه)",icon:"⚗️"},
+      {key:"chemistry_12",label:"شیمی ۳ (دوازدهم)",icon:"⚗️"},
+      {key:"math_pre",label:"ریاضی ۱ و ۲ (پایه)",icon:"🧮"},
+      {key:"math_12",label:"ریاضی ۳ (دوازدهم)",icon:"🧮"},
+      {key:"geology",label:"زمین‌شناسی (جامع)",icon:"🌍"}
+    ],
+    "11":[
+      {key:"biology2",label:"زیست‌شناسی ۲",icon:"🧬"},
+      {key:"physics2",label:"فیزیک ۲",icon:"⚛️"},
+      {key:"chemistry2",label:"شیمی ۲",icon:"⚗️"},
+      {key:"math2",label:"ریاضی ۲",icon:"🧮"},
+      {key:"geology",label:"زمین‌شناسی (جامع)",icon:"🌍"}
+    ],
+    "10":[
+      {key:"biology1",label:"زیست‌شناسی ۱",icon:"🧬"},
+      {key:"physics1",label:"فیزیک ۱",icon:"⚛️"},
+      {key:"chemistry1",label:"شیمی ۱",icon:"⚗️"},
+      {key:"math1",label:"ریاضی ۱",icon:"🧮"}
+    ]
+  },
+  mathematics:{
+    "12":[
+      {key:"math_calc_pre",label:"ریاضی ۱ و حسابان ۱ (پایه)",icon:"🧮"},
+      {key:"calc2",label:"حسابان ۲ (دوازدهم)",icon:"∫"},
+      {key:"geometry_pre",label:"هندسه ۱ و ۲ (پایه)",icon:"📐"},
+      {key:"geometry3",label:"هندسه ۳ (دوازدهم)",icon:"📐"},
+      {key:"statistics",label:"آمار و احتمال",icon:"📊"},
+      {key:"discrete",label:"ریاضیات گسسته",icon:"🔢"},
+      {key:"physics_pre",label:"فیزیک ۱ و ۲ (پایه)",icon:"⚛️"},
+      {key:"physics_12",label:"فیزیک ۳ (دوازدهم)",icon:"⚛️"},
+      {key:"chemistry_pre",label:"شیمی ۱ و ۲ (پایه)",icon:"⚗️"},
+      {key:"chemistry_12",label:"شیمی ۳ (دوازدهم)",icon:"⚗️"}
+    ],
+    "11":[
+      {key:"calc1",label:"حسابان ۱",icon:"∫"},
+      {key:"geometry2",label:"هندسه ۲",icon:"📐"},
+      {key:"statistics",label:"آمار و احتمال",icon:"📊"},
+      {key:"physics2",label:"فیزیک ۲",icon:"⚛️"},
+      {key:"chemistry2",label:"شیمی ۲",icon:"⚗️"}
+    ],
+    "10":[
+      {key:"math1",label:"ریاضی ۱",icon:"🧮"},
+      {key:"geometry1",label:"هندسه ۱",icon:"📐"},
+      {key:"physics1",label:"فیزیک ۱",icon:"⚛️"},
+      {key:"chemistry1",label:"شیمی ۱",icon:"⚗️"}
+    ]
+  },
+  humanities:{
+    "12":[
+      {key:"mathStats_pre",label:"ریاضی و آمار ۱ و ۲ (پایه)",icon:"📊"},
+      {key:"mathStats3",label:"ریاضی و آمار ۳ (دوازدهم)",icon:"📊"},
+      {key:"literaryArts_pre",label:"علوم و فنون ادبی ۱ و ۲ (پایه)",icon:"✒️"},
+      {key:"literaryArts3",label:"علوم و فنون ادبی ۳ (دوازدهم)",icon:"✒️"},
+      {key:"literaryDevices",label:"آرایه‌های ادبی",icon:"🖋️"},
+      {key:"sociology_pre",label:"جامعه‌شناسی ۱ و ۲ (پایه)",icon:"👥"},
+      {key:"sociology3",label:"جامعه‌شناسی ۳ (دوازدهم)",icon:"👥"},
+      {key:"psychology",label:"روان‌شناسی",icon:"🧠"},
+      {key:"arabicSpec_pre",label:"عربی تخصصی ۱ و ۲ (پایه)",icon:"📗"},
+      {key:"arabicSpec3",label:"عربی تخصصی ۳ (دوازدهم)",icon:"📗"},
+      {key:"history_pre",label:"تاریخ ۱ و ۲ (پایه)",icon:"🏛️"},
+      {key:"history3",label:"تاریخ ۳ (دوازدهم)",icon:"🏛️"},
+      {key:"geography_pre",label:"جغرافیا ۱ و ۲ (پایه)",icon:"🗺️"},
+      {key:"geography3",label:"جغرافیا ۳ (دوازدهم)",icon:"🗺️"},
+      {key:"logic",label:"منطق",icon:"🔎"},
+      {key:"philosophy1",label:"فلسفه ۱",icon:"💭"},
+      {key:"philosophy2",label:"فلسفه ۲",icon:"💭"},
+      {key:"economics",label:"اقتصاد",icon:"💰"}
+    ],
+    "11":[
+      {key:"mathStats2",label:"ریاضی و آمار ۲",icon:"📊"},
+      {key:"literaryArts2",label:"علوم و فنون ادبی ۲",icon:"✒️"},
+      {key:"sociology2",label:"جامعه‌شناسی ۲",icon:"👥"},
+      {key:"psychology",label:"روان‌شناسی",icon:"🧠"},
+      {key:"arabicSpec2",label:"عربی تخصصی ۲",icon:"📗"},
+      {key:"history2",label:"تاریخ ۲",icon:"🏛️"},
+      {key:"geography2",label:"جغرافیا ۲",icon:"🗺️"},
+      {key:"philosophy1",label:"فلسفه ۱",icon:"💭"}
+    ],
+    "10":[
+      {key:"mathStats1",label:"ریاضی و آمار ۱",icon:"📊"},
+      {key:"literaryArts1",label:"علوم و فنون ادبی ۱",icon:"✒️"},
+      {key:"sociology1",label:"جامعه‌شناسی ۱",icon:"👥"},
+      {key:"arabicSpec1",label:"عربی تخصصی ۱",icon:"📗"},
+      {key:"history1",label:"تاریخ ۱",icon:"🏛️"},
+      {key:"geographyIran",label:"جغرافیای ایران",icon:"🗺️"},
+      {key:"logic",label:"منطق",icon:"🔎"}
+    ]
+  }
+};
+function mockExamSubjectList(curriculum,grade){
+  return (MOCK_EXAM_SUBJECT_LISTS[curriculum]&&MOCK_EXAM_SUBJECT_LISTS[curriculum][grade])||[];
 }
+function mockExamSubjectLabel(curriculum,grade,key){
+  const item=mockExamSubjectList(curriculum,grade).find(s=>s.key===key);
+  return item?item.label:key;
+}
+function mockExamSubjectIcon(curriculum,grade,key){
+  const item=mockExamSubjectList(curriculum,grade).find(s=>s.key===key);
+  return item?item.icon:"📘";
+}
+function ensureMockExams(){if(!Array.isArray(state.mockExams))state.mockExams=[]}
+window.setMockExamGradeCurriculum=function(){
+  const g=document.getElementById('mockExamGrade')?.value||'10';
+  const c=document.getElementById('mockExamCurriculum')?.value||'experimental';
+  state.settings.mockExamGrade=g;
+  state.settings.mockExamCurriculum=c;
+  save();
+  populateMockExamSubjects();
+};
 function populateMockExamSubjects(){
   const wrap=document.getElementById('mockExamSubjects');if(!wrap)return;
   populateMockExamJalaliDate();
-  const c=state.settings.selectedCurriculum||'experimental';
-  const keys=mockExamSubjectKeys(c);
-  wrap.innerHTML=keys.map(k=>`<div class="field-mini"><label>${SUBJECTS[k]?.icon||'📘'} ${esc(subjectDisplayName(k,c))}</label><input type="number" id="mockExamSubj_${k}" min="-100" max="100" step="0.1" placeholder="٪"></div>`).join('');
+  const gradeSel=document.getElementById('mockExamGrade'),curSel=document.getElementById('mockExamCurriculum');
+  const c=state.settings.mockExamCurriculum||state.settings.selectedCurriculum||'experimental';
+  const g=state.settings.mockExamGrade||state.settings.dashboardGrade||'10';
+  if(gradeSel)gradeSel.value=g;
+  if(curSel)curSel.value=c;
+  const list=mockExamSubjectList(c,g);
+  wrap.innerHTML=list.map(s=>`<div class="field-mini"><label>${s.icon} ${esc(s.label)}</label><input type="number" id="mockExamSubj_${s.key}" min="-100" max="100" step="0.1" placeholder="٪"></div>`).join('')||'<div class="empty">برای این پایه/رشته لیست درسی تعریف نشده.</div>';
 }
 const JALALI_MONTH_NAMES=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
 function toPersianDigits(n){const map={'0':'۰','1':'۱','2':'۲','3':'۳','4':'۴','5':'۵','6':'۶','7':'۷','8':'۸','9':'۹'};return String(n).replace(/[0-9]/g,d=>map[d]);}
@@ -2926,20 +3044,21 @@ function addMockExam(){
   const rankRaw=document.getElementById('mockExamRank')?.value;
   const rank=rankRaw?Number(rankRaw):null;
   if(!Number.isFinite(overall)||overall<=0){showToast('تراز کل را وارد کن.');return;}
-  const curriculum=state.settings.selectedCurriculum||'experimental';
-  const keys=mockExamSubjectKeys(curriculum);
+  const curriculum=state.settings.mockExamCurriculum||state.settings.selectedCurriculum||'experimental';
+  const grade=state.settings.mockExamGrade||state.settings.dashboardGrade||'10';
+  const list=mockExamSubjectList(curriculum,grade);
   const subjects={};
-  keys.forEach(k=>{
-    const el=document.getElementById('mockExamSubj_'+k);
-    if(el&&el.value!==''){const v=Number(el.value);if(Number.isFinite(v))subjects[k]=v;}
+  list.forEach(s=>{
+    const el=document.getElementById('mockExamSubj_'+s.key);
+    if(el&&el.value!==''){const v=Number(el.value);if(Number.isFinite(v))subjects[s.key]=v;}
   });
-  state.mockExams.unshift({id:'mx_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),date,source,name,curriculum,overall,rank,subjects,createdAt:Date.now()});
+  state.mockExams.unshift({id:'mx_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),date,source,name,curriculum,grade,overall,rank,subjects,createdAt:Date.now()});
   save();renderMockExams();
   const nameEl=document.getElementById('mockExamName');if(nameEl)nameEl.value='';
   const sourceEl=document.getElementById('mockExamSource');if(sourceEl)sourceEl.value='';
   const pctEl=document.getElementById('mockExamPercentile');if(pctEl)pctEl.value='';
   const rankEl=document.getElementById('mockExamRank');if(rankEl)rankEl.value='';
-  keys.forEach(k=>{const el=document.getElementById('mockExamSubj_'+k);if(el)el.value='';});
+  list.forEach(s=>{const el=document.getElementById('mockExamSubj_'+s.key);if(el)el.value='';});
   showToast('آزمون آزمایشی ثبت شد.');
 }
 function deleteMockExam(id){
@@ -3002,11 +3121,14 @@ function renderMockExams(){
   }
   if(!arr.length){listEl.innerHTML='<div class="empty">هنوز آزمونی ثبت نشده.</div>';return;}
   listEl.innerHTML=arr.map(x=>{
-    const curriculum=x.curriculum||state.settings.selectedCurriculum||'experimental';
-    const subjBadges=Object.entries(x.subjects||{}).map(([k,v])=>`<span class="leitner-box-badge">${SUBJECTS[k]?.icon||'📘'} ${esc(subjectDisplayName(k,curriculum))}: ${v}%</span>`).join(' ');
+    const curriculum=x.curriculum||state.settings.mockExamCurriculum||'experimental';
+    const grade=x.grade||state.settings.mockExamGrade||'10';
+    const gradeLabel={"10":"دهم","11":"یازدهم","12":"دوازدهم"}[grade]||grade;
+    const curLabel={experimental:"تجربی",mathematics:"ریاضی",humanities:"انسانی"}[curriculum]||curriculum;
+    const subjBadges=Object.entries(x.subjects||{}).map(([k,v])=>`<span class="leitner-box-badge">${mockExamSubjectIcon(curriculum,grade,k)} ${esc(mockExamSubjectLabel(curriculum,grade,k))}: ${v}%</span>`).join(' ');
     return `<div class="mistake-card">
       <div class="top"><b>${mockExamSourceIcon(x.source)} ${esc(x.name)||esc(x.source||'آزمون')}</b><span style="font-weight:900;color:var(--accent)">تراز ${fmt(x.overall)}</span></div>
-      <div class="muted small">${isoToJalaliLabel(x.date)}${x.rank?` • رتبه ${fmt(x.rank)}`:''} • ${esc(x.source||'')}</div>
+      <div class="muted small">${isoToJalaliLabel(x.date)}${x.rank?` • رتبه ${fmt(x.rank)}`:''} • ${esc(x.source||'')} • پایه ${gradeLabel} ${curLabel}</div>
       ${subjBadges?`<div class="note" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">${subjBadges}</div>`:''}
       <div class="actions" style="margin-top:7px"><button class="btn danger" onclick="deleteMockExam('${x.id}')">🗑 حذف</button></div>
     </div>`;
