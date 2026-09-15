@@ -50,14 +50,14 @@ h1,h2,h3{margin:0 0 8px}.muted{color:var(--muted);font-size:.9rem}
 .bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:.35s}
 .xpbar{margin-top:10px}
 .xpmeta{display:flex;justify-content:space-between;color:var(--muted);font-size:.78rem;margin-bottom:5px}
-.subjects{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.subjects{display:flex;flex-direction:column;gap:8px}
 .subject{padding:12px;border:1px solid var(--border);border-radius:13px;background:rgba(125,145,190,.06)}
 .subject-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;min-width:0}
-.subject-top b{min-width:0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;white-space:normal;line-height:1.35;word-break:break-word}
+.subject-top b{min-width:0;overflow-wrap:break-word;word-break:break-word;white-space:normal;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 .subject-top .pill{flex:none;margin-top:1px}
 .pill{font-size:.72rem;padding:4px 8px;border-radius:99px;background:rgba(110,231,255,.1);color:var(--accent)}
 .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-@media(max-width:600px){.formgrid{grid-template-columns:1fr}.subjects{grid-template-columns:1fr}}
+@media(max-width:600px){.formgrid{grid-template-columns:1fr}}
 .mock-subj-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .mock-jalali-date{display:flex;gap:6px}
 .mock-jalali-date select{min-width:0;flex:1}
