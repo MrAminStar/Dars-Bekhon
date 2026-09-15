@@ -157,11 +157,6 @@
     <div id="globalStats"></div>
 <div class="smart-tools">
   <div class="smart-card">
-    <h3>🧠 مرور هوشمند</h3>
-    <div id="smartReviews" class="smart-list"></div>
-    <div class="smart-actions"><button class="btn" onclick="showSmartReviews()">🔄 به‌روزرسانی</button></div>
-  </div>
-  <div class="smart-card">
     <h3>📉 تحلیل ضعف</h3>
     <div id="smartWeakness" class="smart-list"></div>
   </div>
@@ -170,26 +165,6 @@
     <div id="smartStreak" class="smart-list"></div>
   </div>
 
-</div>
-<div class="smart-plan card" id="autoPlanCard">
-  <div class="smart-plan-head"><div><span class="section-kicker">برنامه‌ریز خودکار</span><h3>⏱️ برنامه امروز</h3><p class="muted small">بازه روزت را بده؛ خودش با کم‌کردن کلاس‌ها و روتین‌های ثابتت (از صفحه «برنامه روزانه» و «روتین») زمان آزاد واقعی را پیدا می‌کند و بین دروس ضعیف‌تر و مرورهای سررسید تقسیم می‌کند. اگر برنامه به‌هم خورد، «بازسازی» کن.</p></div></div>
-  <div class="actions" style="margin-bottom:6px;flex-wrap:wrap;align-items:flex-end">
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <label class="muted small">شروع روز</label>
-      <input id="autoPlanDayStart" type="time" style="max-width:110px" onchange="renderDailyAutoPlan()">
-    </div>
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <label class="muted small">پایان روز</label>
-      <input id="autoPlanDayEnd" type="time" style="max-width:110px" onchange="renderDailyAutoPlan()">
-    </div>
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <label class="muted small">سقف دقیقه مطالعه (اختیاری)</label>
-      <input id="autoPlanMinutes" type="number" min="10" max="900" step="5" style="max-width:150px" placeholder="خالی = همه زمان آزاد">
-    </div>
-    <button class="btn primary" onclick="renderDailyAutoPlan()">🧩 بساز / بازسازی برنامه</button>
-  </div>
-  <div id="autoPlanFreeSummary" class="muted small" style="margin:2px 0 10px"></div>
-  <div id="autoPlanList" class="smart-plan-list"></div>
 </div>
 <div id="focusOverlay" class="focus-overlay" aria-hidden="true">
   <div class="focus-box">
@@ -881,7 +856,7 @@
 </div>
 </div>
 <div class="card span-6"><h2>📦 مدیریت داده</h2><p class="muted">اطلاعات در همین مرورگر ذخیره می‌شود.</p><button class="btn" onclick="exportData()">دانلود نسخه پشتیبان</button><div class="muted small" id="lastBackupInfo" style="margin-top:8px">—</div></div>
-<div class="card span-6"><h2>💡 قوانین</h2><ul class="muted"><li>ظرفیت پیشنهادی فقط پیشنهاد است.</li><li>مدت مطالعه و استراحت از تنظیمات خوانده می‌شود.</li><li>تحلیل اشتباه‌ها پاداش بیشتری می‌دهد.</li></ul></div>
+<div class="card span-6"><h2>💡 قوانین</h2><ul class="muted"><li>ظرفیت پیشنهادی فقط پیشنهاد است.</li><li>مدت مطالعه و استراحت از تنظیمات خوانده می‌شود.</li><li>تحلیل اشتباه‌ها پاداش بیشتری می‌دهد.</li><li>این برنامه صرفاً یک ابزار کمکی است و پیشنهادها، تحلیل‌ها و برنامه‌ریزی‌های آن ممکن است دارای خطا یا باگ باشند؛ تصمیم نهایی برای استفاده از این پیشنهادها و هرگونه مسئولیت ناشی از اشتباهات یا خطاهای احتمالی سیستم، بر عهده خود کاربر است.</li></ul></div>
 </div>
 </section>
 <footer>

@@ -1090,16 +1090,6 @@ function getSmartSubjects(){
   const c=state.settings.selectedCurriculum||'experimental', g=state.settings.dashboardGrade||'10';
   return curriculumSubjectKeys(c).filter(k=>state.subjects[k]&&subjectMatchesGrade(k,g,c));
 }
-function showSmartReviews(){
-  const el=document.getElementById('smartReviews'); if(!el)return;
-  const arr=[];
-  getSmartSubjects().forEach(k=>{const s=state.subjects[k]||{}; const topics=Object.entries(s.topics||{});
-    topics.forEach(([topic,t])=>{const age=smartDateDaysAgo(t.last),ret=Number(t.retention||0); const score=(ret<45?100:0)+(age>=7?40:age>=3?20:0)+(100-ret)*.35; if(score>45)arr.push({k,topic,ret,age,score});});
-    if(!topics.length && (s.knowledge||0)<55)arr.push({k,topic:'مرور کلی درس',ret:s.knowledge||0,age:999,score:60+(55-(s.knowledge||0))});
-  });
-  arr.sort((a,b)=>b.score-a.score);
-  el.innerHTML=arr.slice(0,4).map(x=>`<div class="smart-item"><span>${esc(subjectDisplayName(x.k,state.settings.selectedCurriculum))} — ${esc(x.topic)}</span><b>${x.age===999?'شروع نشده':x.age+' روز'} </b></div>`).join('')||'<div class="empty">فعلاً مرور فوری شناسایی نشد.</div>';
-}
 let studyTimer=null,studyTimerSeconds=25*60,studyTimerTotal=25*60,studyTimerRunning=false;
 let studyTimerSubject='',studyTimerSubjectLabel='',studyTimerTopic='',studyTimerSavedAt=0,studyTimerStartedAt=0;
 const STUDY_TIMER_STORAGE='darsbekhon_offline_study_timer_v2';
@@ -1260,10 +1250,6 @@ function renderSmartTools(){
   weakEl.innerHTML=candidates.slice(0,4).map(x=>`<div class="smart-item"><span>${esc(subjectDisplayName(x.k,state.settings.selectedCurriculum))}</span><b>${Math.round(x.s.knowledge||0)}٪</b></div>`).join('')||'<div class="empty">داده کافی نیست.</div>';
   const eps=dayEpisodes().reduce((n,e)=>n+e.minutes,0);
   streakEl.innerHTML=`<div class="smart-item"><span>زنجیره فعلی</span><b>${fmt(state.streak)} روز 🔥</b></div><div class="smart-item"><span>مطالعه امروز</span><b>${fmt(eps)} دقیقه</b></div>`;
-  showSmartReviews();
-  const apInput=document.getElementById('autoPlanMinutes');
-  if(apInput&&apInput.value===''&&state.settings.autoPlanMinutes!=null)apInput.value=state.settings.autoPlanMinutes;
-  if(typeof renderDailyAutoPlan==='function')renderDailyAutoPlan();
 }
 function openFocusMode(){
   const keys=getSmartSubjects(); const pick=keys.sort((a,b)=>(state.subjects[a].knowledge||0)-(state.subjects[b].knowledge||0))[0];
@@ -1358,215 +1344,6 @@ function buildSmartPlan(){
 }
 window.buildSmartPlan=buildSmartPlan;
 
-/* ===================== REAL DAY SCHEDULE HELPERS ===================== */
-// Maps JS Date#getDay() (0=Sunday..6=Saturday) to the Persian day names used by
-// state.classes[].day, so classes/routines can be checked against "today" consistently.
-const FA_DAY_BY_JS={0:'یکشنبه',1:'دوشنبه',2:'سه‌شنبه',3:'چهارشنبه',4:'پنجشنبه',5:'جمعه',6:'شنبه'};
-function timeToMinutes(t){
-  if(!t||typeof t!=='string')return null;
-  const m=t.match(/^(\d{1,2}):(\d{2})/);
-  if(!m)return null;
-  return Math.max(0,Math.min(1439,(+m[1])*60+(+m[2])));
-}
-function minutesToClock(m){
-  m=Math.max(0,Math.min(1439,Math.round(m)));
-  return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
-}
-// Fixed commitments for today: scheduled classes (برنامه روزانه) + active routines, merged into busy blocks.
-function getDayBusyBlocks(dateObj){
-  const jsDay=dateObj.getDay();
-  const faDay=FA_DAY_BY_JS[jsDay];
-  const blocks=[];
-  (state.classes||[]).forEach(c=>{
-    if(c.day!==faDay)return;
-    const start=timeToMinutes(c.time);
-    if(start==null)return;
-    let end=timeToMinutes(c.endTime);
-    if(end==null||end<=start)end=start+60;
-    blocks.push({start,end,label:c.title||'کلاس'});
-  });
-  (state.routines||[]).forEach(r=>{
-    if(r.active===false)return;
-    if(!Array.isArray(r.days)||!r.days.includes(jsDay))return;
-    const start=timeToMinutes(r.time);
-    if(start==null)return;
-    const end=start+Math.max(1,Math.round(+r.duration||30));
-    blocks.push({start,end,label:r.name||'روتین'});
-  });
-  blocks.sort((a,b)=>a.start-b.start);
-  const merged=[];
-  blocks.forEach(b=>{
-    const last=merged[merged.length-1];
-    if(last&&b.start<=last.end)last.end=Math.max(last.end,b.end);
-    else merged.push({...b});
-  });
-  return merged;
-}
-function getAutoPlanWindow(){
-  let start=timeToMinutes(state.settings.autoPlanDayStart);
-  let end=timeToMinutes(state.settings.autoPlanDayEnd);
-  if(start==null)start=8*60;
-  if(end==null)end=23*60+30;
-  if(end<=start)end=Math.min(1439,start+60);
-  return{start,end};
-}
-// The actual free time left today, after removing classes/routines from the day window.
-function getFreeWindowsToday(){
-  const{start,end}=getAutoPlanWindow();
-  const busy=getDayBusyBlocks(new Date());
-  const windows=[];
-  let cursor=start;
-  busy.forEach(b=>{
-    const s=Math.max(b.start,start),e=Math.min(b.end,end);
-    if(e<=s)return;
-    if(s>cursor)windows.push({start:cursor,end:s});
-    cursor=Math.max(cursor,e);
-  });
-  if(cursor<end)windows.push({start:cursor,end});
-  return windows.filter(w=>w.end-w.start>=5);
-}
-// Greedy-fills the free windows in order, taking from the front of the item queue. If an
-// item doesn't fully fit before a window closes (a class/routine starts), the scheduled
-// part is placed now and the leftover continues at the start of the next window - so a
-// session survives being split by a busy block instead of quietly losing time to it.
-function scheduleItemsIntoWindows(items,windows,breakMinutes){
-  const MIN_CHUNK=15;
-  const queue=items.map((it,idx)=>({...it,id:idx,remaining:it.minutes}));
-  const placed=[];
-  windows.forEach(win=>{
-    let cursor=win.start;
-    while(cursor<win.end&&queue.length&&queue[0].remaining>0){
-      const cur=queue[0];
-      const space=win.end-cursor;
-      if(space<MIN_CHUNK)break;
-      const take=Math.min(cur.remaining,space);
-      placed.push({...cur,start:cursor,end:cursor+take,minutes:take});
-      cursor+=take;
-      cur.remaining-=take;
-      if(cur.remaining<=0){
-        queue.shift();
-        if(queue.length&&cursor+breakMinutes<=win.end)cursor+=breakMinutes;
-      }else break; // continues at the top of the next window
-    }
-  });
-  queue.forEach(q=>{if(q.remaining>0)placed.push({...q,start:null,end:null,minutes:q.remaining,unscheduled:true});});
-  return placed;
-}
-
-/* ===================== AUTO DAILY PLANNER (برنامه‌ریز خودکار روزانه) ===================== */
-function buildDailyAutoPlan(requestedMinutes){
-  const keys=getSmartSubjects();
-  const windows=getFreeWindowsToday();
-  const freeMinutes=windows.reduce((a,w)=>a+(w.end-w.start),0);
-  if(!keys.length||!freeMinutes){
-    return{items:[],reserve:0,dueMistakesCount:0,dueLeitnerCount:0,freeMinutes,windows,usedMinutes:0,requestedMinutes:0,cappedByFreeTime:false};
-  }
-  let totalMinutes=Number.isFinite(requestedMinutes)&&requestedMinutes>0?Math.round(requestedMinutes):freeMinutes;
-  const cappedByFreeTime=totalMinutes>freeMinutes;
-  totalMinutes=Math.max(10,Math.min(freeMinutes,totalMinutes));
-
-  const dueMistakes=(state.mistakes||[]).filter(x=>!x.resolved&&leitnerIsDue(x));
-  const dueLeitner=(state.leitner.cards||[]).filter(leitnerIsDue);
-  // Review time now scales with the actual backlog instead of a flat 20%-of-total guess.
-  const reserve=Math.min(totalMinutes,Math.round(dueMistakes.length*4+dueLeitner.length*2));
-  const studyMinutes=Math.max(0,totalMinutes-reserve);
-
-  const MIN_BLOCK=20,SCORE_THRESHOLD=20;
-  const breakMinutes=Math.max(0,Math.min(60,+state.settings.breakMinutes||10));
-  const scored=keys.map(k=>({k,score:Math.max(1,smartSubjectScore(k))})).sort((a,b)=>b.score-a.score);
-  // Only subjects that actually clear a relevance bar compete for time; if everything is
-  // in decent shape (rare), fall back to ranking by score so the plan isn't empty.
-  const qualifying=scored.filter(x=>x.score>=SCORE_THRESHOLD);
-  const pool=(qualifying.length?qualifying:scored).slice(0,6);
-  const maxSlots=Math.max(0,Math.floor(studyMinutes/(MIN_BLOCK+breakMinutes)));
-  const top=pool.slice(0,Math.min(maxSlots,pool.length));
-  // Reserve time for the breaks *between* sessions up front, so the totals add up instead
-  // of quietly losing minutes to breaks once the schedule is actually placed.
-  const itemCount=(reserve>0?1:0)+top.length;
-  const breakBudget=Math.max(0,itemCount-1)*breakMinutes;
-  const allocatable=Math.max(0,studyMinutes-breakBudget);
-
-  let items=[];
-  if(top.length&&allocatable>0){
-    const scoreSum=top.reduce((a,x)=>a+x.score,0)||1;
-    items=top.map(x=>({
-      k:x.k,
-      minutes:Math.max(MIN_BLOCK,Math.round(allocatable*x.score/scoreSum/5)*5),
-      reason:smartReason(x.k)
-    }));
-    let diff=allocatable-items.reduce((a,x)=>a+x.minutes,0);
-    let guard=0;
-    while(diff>=5&&items.length&&guard<200){items[guard%items.length].minutes+=5;diff-=5;guard++;}
-    guard=0;
-    while(diff<=-5&&guard<200){
-      const idx=items.findIndex(x=>x.minutes>MIN_BLOCK);
-      if(idx<0)break;
-      items[idx].minutes-=5;diff+=5;guard++;
-    }
-  }
-
-  const scheduleItems=[];
-  if(reserve>0)scheduleItems.push({kind:'review',label:'مرور و اشتباهات سررسید',minutes:reserve});
-  items.forEach(x=>scheduleItems.push({kind:'subject',...x}));
-  const placed=scheduleItemsIntoWindows(scheduleItems,windows,breakMinutes);
-  const usedMinutes=placed.reduce((a,p)=>a+(p.unscheduled?0:p.minutes),0);
-
-  return{items:placed,reserve,dueMistakesCount:dueMistakes.length,dueLeitnerCount:dueLeitner.length,freeMinutes,windows,usedMinutes,requestedMinutes:totalMinutes,cappedByFreeTime};
-}
-window.buildDailyAutoPlan=buildDailyAutoPlan;
-
-function renderDailyAutoPlan(){
-  const el=document.getElementById('autoPlanList');if(!el)return;
-  const sumEl=document.getElementById('autoPlanFreeSummary');
-  const input=document.getElementById('autoPlanMinutes');
-  const dsInput=document.getElementById('autoPlanDayStart'),deInput=document.getElementById('autoPlanDayEnd');
-  if(dsInput&&!dsInput.value)dsInput.value=state.settings.autoPlanDayStart||'08:00';
-  if(deInput&&!deInput.value)deInput.value=state.settings.autoPlanDayEnd||'23:30';
-  state.settings.autoPlanDayStart=dsInput?dsInput.value:(state.settings.autoPlanDayStart||'08:00');
-  state.settings.autoPlanDayEnd=deInput?deInput.value:(state.settings.autoPlanDayEnd||'23:30');
-
-  const rawVal=input?input.value.trim():'';
-  const requested=rawVal===''?null:Math.max(10,Math.min(900,Math.round(+rawVal)));
-  state.settings.autoPlanMinutes=requested;
-  save();
-
-  const{items,reserve,dueMistakesCount,dueLeitnerCount,freeMinutes,usedMinutes,requestedMinutes,cappedByFreeTime}=buildDailyAutoPlan(requested);
-
-  if(sumEl){
-    const{start,end}=getAutoPlanWindow();
-    sumEl.textContent=freeMinutes
-      ? `بین ${minutesToClock(start)} تا ${minutesToClock(end)}، با کم‌کردن کلاس‌ها و روتین‌های ثابتت، ${fmt(freeMinutes)} دقیقه زمان آزاد داری.`
-      : `بین ${minutesToClock(start)} تا ${minutesToClock(end)} زمان آزادی پیدا نشد؛ بازه روز یا کلاس/روتین‌هات را بررسی کن.`;
-  }
-
-  if(!freeMinutes){el.innerHTML='<div class="empty">امروز طبق کلاس‌ها/روتین‌هات، توی این بازه زمان آزادی ثبت نشده.</div>';return}
-  if(!items.length){el.innerHTML='<div class="empty">داده کافی نیست؛ اول رشته/پایه‌ات را در بالای داشبورد انتخاب کن یا چند پارت مطالعه ثبت کن.</div>';return}
-
-  // A session that got split by a class/routine shows up as several raw chunks with the
-  // same id; group them back into one card with a comma-separated list of time ranges.
-  const grouped=[];
-  const byId=new Map();
-  items.forEach(x=>{
-    if(!byId.has(x.id)){const g={...x,minutes:0,chunks:[],unscheduled:false};byId.set(x.id,g);grouped.push(g);}
-    const g=byId.get(x.id);
-    g.minutes+=x.minutes;
-    if(x.unscheduled)g.unscheduled=true;else g.chunks.push({start:x.start,end:x.end});
-  });
-
-  const capNote=cappedByFreeTime?`<div class="muted small" style="margin-bottom:6px">⚠ زمان درخواستی از زمان آزاد واقعی بیشتر بود؛ به ${fmt(freeMinutes)} دقیقه محدود شد.</div>`:'';
-
-  el.innerHTML=capNote+grouped.map(x=>{
-    const ranges=x.chunks.map(c=>`${minutesToClock(c.start)}–${minutesToClock(c.end)}`).join('، ');
-    const time=ranges||'⏳ توی بازه‌های آزاد امروز جا نشد';
-    const leftoverNote=x.unscheduled?(ranges?' • ⚠ بخشی از این جلسه توی زمان آزاد امروز جا نشد':''):'';
-    if(x.kind==='review'){
-      return `<article class="smart-plan-item"><div class="meta"><b>🧠 ${esc(x.label)}</b><span>${time} • ${fmt(x.minutes)} دقیقه</span></div><div>📌 ${fmt(dueMistakesCount)} اشتباه سررسید • ${fmt(dueLeitnerCount)} کارت لایتنر</div><div class="actions"><button class="btn" onclick="switchToPage('leitner')">▶ برو به مرور</button></div></article>`;
-    }
-    return `<article class="smart-plan-item"><div class="meta"><b>${esc(subjectDisplayName(x.k,state.settings.selectedCurriculum))}</b><span>${time} • ${fmt(x.minutes)} دقیقه${leftoverNote}</span></div><div class="why">🎯 ${esc(x.reason)}</div><div class="actions"><button class="btn primary" onclick="startSmartTask('${esc(x.k)}','',${x.minutes})">▶ شروع</button></div></article>`;
-  }).join('')+
-    `<div class="muted small" style="margin-top:8px">مجموع برنامه‌ریزی‌شده: ${fmt(usedMinutes)} از ${fmt(requestedMinutes)} دقیقه</div>`;
-}
-window.renderDailyAutoPlan=renderDailyAutoPlan;
 function startSmartTask(k,topic,minutes){
  switchToPage('leitner');
  switchToolboxTab('timer');
@@ -2140,8 +1917,8 @@ function renderMiniSubjects(){
   if(picker)picker.value=key;
   if(gradeSel)gradeSel.value=gr;
   if(!key){el.innerHTML='<div class="empty">رشته تحصیلی را انتخاب کن تا وضعیت دروس نمایش داده شود.</div>';return}
-  const allKeys=curriculumSubjectKeys(key);
-  const visible=allKeys.filter(k=>subjectMatchesGrade(k,gr,key));
+  // همان فیلتر لیست دروس صفحه «پارت مطالعه» (populateEpisodeSubjects) تا دو لیست همیشه یکی باشند.
+  const visible=curriculumSubjectKeys(key).filter(k=>CHECKLIST_TEMPLATES[k]&&subjectMatchesGrade(k,gr,key));
   if(!visible.length){el.innerHTML='<div class="empty">درسی برای این پایه یافت نشد.</div>';return}
   el.innerHTML=visible.map(k=>{
     const v=SUBJECTS[k],s=state.subjects[k];
