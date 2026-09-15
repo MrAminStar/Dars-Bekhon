@@ -946,7 +946,7 @@ body[data-density="compact"] .stat{padding:9px}
 .page-select{background-image:none!important;padding-left:14px!important;} .page-select::-ms-expand{display:none}
 /* Mobile edge spacing fix for major pages */
 @media(max-width:700px){
-  .page{width:100%;box-sizing:border-box;padding-inline:7px;overflow:visible;}
+  .page{width:100%;box-sizing:border-box;overflow:visible;}
   .page > .grid,.page > .routine-shell{width:100%;max-width:100%;box-sizing:border-box;}
   #settings .card,#boss .card,#mockExams .card,#achievements .card,#shop .card,#routines .card,#mistakes .card{box-sizing:border-box;max-width:100%;}
   #settings .grid,#boss .grid,#mockExams .grid,#mistakes .grid{width:100%;box-sizing:border-box;}
@@ -1005,7 +1005,7 @@ body[data-density="compact"] .stat{padding:9px}
     width:100%!important;
     max-width:100%!important;
     box-sizing:border-box!important;
-    padding:0 8px!important;
+    padding:0!important;
     overflow-x:hidden!important;
   }
   #settings > .grid,#boss > .boss-v5,#mockExams > .grid,#achievements > .card,#shop > .card,#routines > .routine-shell,#mistakes > .grid{
