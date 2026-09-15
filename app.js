@@ -1203,6 +1203,21 @@ function updateOfflineStudyTimer(){
   if(lenEl)lenEl.textContent=formatTimerNumber(studyTimerTotal/60)+' دقیقه';
   const oldTopic=document.getElementById('studyTimerTopic');if(oldTopic&&oldTopic.value!==studyTimerTopic)oldTopic.value=studyTimerTopic;
 }
+function resyncStudyTimerClock(){
+  if(!studyTimerRunning||!studyTimerStartedAt)return;
+  const passed=Math.max(0,Math.floor((Date.now()-studyTimerStartedAt)/1000));
+  if(passed<=0)return;
+  studyTimerSeconds=Math.max(0,studyTimerSeconds-passed);
+  if(studyTimerSeconds<=0){
+    studyTimerSeconds=0;studyTimerRunning=false;clearInterval(studyTimer);studyTimer=null;studyTimerStartedAt=0;
+    saveOfflineStudyTimer();updateOfflineStudyTimer();
+    showToast('زمان جلسه تمام شد. جلسه مطالعه ثبت می‌شود.');
+    logCurrentTimerSession(true);
+    return;
+  }
+  studyTimerStartedAt=Date.now();
+  saveOfflineStudyTimer();updateOfflineStudyTimer();
+}
 function loadOfflineStudyTimer(){
   try{
     let x=JSON.parse(localStorage.getItem(STUDY_TIMER_STORAGE)||'null');
@@ -1210,12 +1225,17 @@ function loadOfflineStudyTimer(){
     if(x&&Number.isFinite(x.seconds)&&Number.isFinite(x.total)){
       studyTimerTotal=Math.max(60,Math.min(240*60,x.total));studyTimerSeconds=Math.max(0,Math.min(studyTimerTotal,x.seconds));
       studyTimerSubject=typeof x.subject==='string'&&state.subjects[x.subject]?x.subject:'';studyTimerSubjectLabel=typeof x.subjectLabel==='string'?x.subjectLabel:'';studyTimerTopic=typeof x.topic==='string'?x.topic.slice(0,60):'';studyTimerSavedAt=Number(x.savedAt)||0;studyTimerStartedAt=Number(x.startedAt)||0;
-      if(x.running&&studyTimerStartedAt){const passed=Math.max(0,Math.floor((Date.now()-studyTimerStartedAt)/1000));studyTimerSeconds=Math.max(0,studyTimerSeconds-passed);if(studyTimerSeconds>0){studyTimerRunning=true;studyTimerStartedAt=Date.now();}else{studyTimerRunning=false;studyTimerStartedAt=0;}}
+      studyTimerRunning=!!(x.running&&studyTimerStartedAt);
+      resyncStudyTimerClock();
     }
   }catch(e){}
   populateStudyTimerSubjects();updateOfflineStudyTimer();
   if(studyTimerRunning)startStudyTimerInterval();
 }
+// وقتی برنامه از پس‌زمینه به پیش‌زمینه برمی‌گردد (تعویض اپ/تب یا خاموش‌شدن صفحه)، ساعت تایمر را با زمان واقعی هماهنگ کن
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)resyncStudyTimerClock();});
+window.addEventListener('pageshow',()=>{resyncStudyTimerClock();});
+window.addEventListener('focus',()=>{resyncStudyTimerClock();});
 function setStudyTimerPreset(min,el){if(studyTimerRunning)return;studyTimerTotal=Math.max(60,Math.min(240*60,Math.round(min)*60));studyTimerSeconds=studyTimerTotal;document.querySelectorAll('.timer-preset').forEach(b=>b.classList.remove('active'));if(el)el.classList.add('active');const inp=document.getElementById('studyTimerMinutes');if(inp)inp.value=min;saveOfflineStudyTimer();updateOfflineStudyTimer();}
 function setStudyTimerCustom(v){if(studyTimerRunning)return;let min=Math.round(Number(v));if(!Number.isFinite(min))min=25;min=Math.max(1,Math.min(240,min));studyTimerTotal=min*60;studyTimerSeconds=studyTimerTotal;document.querySelectorAll('.timer-preset').forEach(b=>b.classList.remove('active'));saveOfflineStudyTimer();updateOfflineStudyTimer();}
 function focusStudyTimerCustom(){const inp=document.getElementById('studyTimerMinutes');if(inp){inp.focus();inp.select();}}
@@ -2209,7 +2229,9 @@ window.cycleChecklistCell = function(subjectKey,sectionId,rowId,colIdx){
     if(meta.mode==="empty") return;
   }
   const tpl=CHECKLIST_TEMPLATES[subjectKey];
-  const colName=(tpl&&tpl.cols[colIdx])||"";
+  const sec=tpl&&(tpl.sections||[]).find(s=>s.id===sectionId);
+  const cols=(sec&&sec.cols)||(tpl&&tpl.cols)||[];
+  const colName=cols[colIdx]||"";
   const cur=getCellState(subjectKey,sectionId,rowId,colIdx);
   let next;
   if(colName==="میزان تسلط"){ next=(cur>=4)?0:cur+1; }
@@ -4270,6 +4292,7 @@ toggleRoutineStudyField();
 ensureMistakes();populateMistakeSubjects();
 ensureMockExams();populateMockExamSubjects();
 render();
+loadOfflineStudyTimer();
 renderExamCountdown();
 renderBackupReminder();
 updateLastBackupInfo();
